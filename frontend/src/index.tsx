@@ -18,10 +18,22 @@ const ResultDisplay: React.FC<{ result: any }> = ({ result }) => {
   if (!result) return null;
   
   // Handle different field names from different endpoints
+  // For job endpoint: use risk_level to determine score
+  const getScoreFromRisk = (risk: string) => {
+    if (risk === 'High') return 0.85;
+    if (risk === 'Medium') return 0.50;
+    return 0.15;
+  };
+  
   const confidence = result.confidence_score !== undefined ? result.confidence_score : 
-                    result.score !== undefined ? result.score : 0;
+                    result.score !== undefined ? result.score : 
+                    getScoreFromRisk(result.risk_level);
+                    
   const probability = result.scam_probability !== undefined ? result.scam_probability : 
-                     result.probability !== undefined ? result.probability : 0;
+                     result.probability !== undefined ? result.probability : 
+                     result.score !== undefined ? result.score :
+                     getScoreFromRisk(result.risk_level);
+                     
   const riskLevel = result.risk_level || 'Low';
   const indicators = result.indicators || [];
   const explanations = result.explanation || result.explanations || [];
@@ -69,13 +81,9 @@ const ResultDisplay: React.FC<{ result: any }> = ({ result }) => {
               <li key={idx} className="text-gray-700">
                 <span className="font-medium">{indicator.category || 'Indicator'}:</span>{' '}
                 {indicator.matches ? indicator.matches.join(', ') : typeof indicator === 'string' ? indicator : JSON.stringify(indicator)}
-                {indicator.severity && (
-                  <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
-                    indicator.severity === 'High' ? 'bg-red-100 text-red-700' :
-                    indicator.severity === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-green-100 text-green-700'
-                  }`}>
-                    {indicator.severity}
+                {indicator.score && (
+                  <span className="ml-2 text-xs px-2 py-1 bg-gray-100 rounded-full">
+                    {(indicator.score * 100).toFixed(0)}%
                   </span>
                 )}
               </li>
@@ -88,12 +96,12 @@ const ResultDisplay: React.FC<{ result: any }> = ({ result }) => {
 };
 
 // ============ ICON COMPONENTS ============
-const IconMessage = () => <span className="material-icons text-blue-600 text-2xl">message</span>;
-const IconWork = () => <span className="material-icons text-purple-600 text-2xl">work</span>;
-const IconLink = () => <span className="material-icons text-green-600 text-2xl">link</span>;
-const IconImage = () => <span className="material-icons text-pink-600 text-2xl">image</span>;
-const IconWarning = () => <span className="material-icons text-orange-600 text-2xl">warning</span>;
-const IconSchool = () => <span className="material-icons text-indigo-600 text-2xl">school</span>;
+const IconMessage = () => <span className="material-icons text-primary text-2xl">message</span>;
+const IconWork = () => <span className="material-icons text-primary text-2xl">work</span>;
+const IconLink = () => <span className="material-icons text-primary text-2xl">link</span>;
+const IconImage = () => <span className="material-icons text-primary text-2xl">image</span>;
+const IconWarning = () => <span className="material-icons text-primary text-2xl">warning</span>;
+const IconSchool = () => <span className="material-icons text-primary text-2xl">school</span>;
 
 // ============ QUIZ MODAL ============
 const QuizModal: React.FC<{ 
@@ -144,8 +152,8 @@ const QuizModal: React.FC<{
             <div className="w-full bg-gray-200 rounded-full h-4 mb-6">
               <div 
                 className={`h-4 rounded-full transition-all ${
-                  percentage >= 80 ? 'bg-green-500' : 
-                  percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                  percentage >= 80 ? 'bg-success' : 
+                  percentage >= 60 ? 'bg-warning' : 'bg-error'
                 }`}
                 style={{ width: `${percentage}%` }}
               />
@@ -158,7 +166,7 @@ const QuizModal: React.FC<{
             <div className="flex gap-4 justify-center">
               <button
                 onClick={handleRestart}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
               >
                 Retry Quiz
               </button>
@@ -197,11 +205,11 @@ const QuizModal: React.FC<{
               onClick={() => handleAnswer(idx)}
               className={`w-full text-left p-4 rounded-lg border transition-all ${
                 selectedAnswer === null
-                  ? 'hover:bg-gray-50 hover:border-blue-300'
+                  ? 'hover:bg-gray-50 hover:border-primary'
                   : idx === question.correct
-                  ? 'bg-green-50 border-green-500'
+                  ? 'bg-success bg-opacity-10 border-success'
                   : selectedAnswer === idx
-                  ? 'bg-red-50 border-red-500'
+                  ? 'bg-error bg-opacity-10 border-error'
                   : 'border-gray-200'
               }`}
               disabled={selectedAnswer !== null}
@@ -209,10 +217,10 @@ const QuizModal: React.FC<{
               <span className="font-medium">{String.fromCharCode(65 + idx)}. </span>
               {option}
               {selectedAnswer !== null && idx === question.correct && (
-                <span className="ml-2 text-green-600">✓</span>
+                <span className="ml-2 text-success">✓</span>
               )}
               {selectedAnswer === idx && idx !== question.correct && (
-                <span className="ml-2 text-red-600">✗</span>
+                <span className="ml-2 text-error">✗</span>
               )}
             </button>
           ))}
@@ -225,7 +233,7 @@ const QuizModal: React.FC<{
           {selectedAnswer !== null && (
             <button
               onClick={handleNext}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
             >
               {currentQuestion < questions.length - 1 ? 'Next Question →' : 'See Results'}
             </button>
@@ -278,28 +286,28 @@ const ScamAnalyzer: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+      <div className="bg-surface rounded-xl shadow-custom-lg border border-custom p-6">
         <div className="flex items-center gap-3 mb-2">
           <IconMessage />
-          <h2 className="text-2xl font-bold text-gray-800">Message Analysis</h2>
+          <h2 className="text-2xl font-bold text-text">Message Analysis</h2>
         </div>
-        <p className="text-gray-600 mb-4 ml-10">Analyze WhatsApp messages, SMS, emails, and other text content</p>
+        <p className="text-secondary mb-4 ml-10">Analyze WhatsApp messages, SMS, emails, and other text content</p>
         <textarea
-          className="w-full h-32 p-4 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          className="w-full h-32 p-4 border border-custom rounded-lg mb-4 focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-surface text-text"
           placeholder="Paste a suspicious message here..."
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
         <button
           className={`w-full py-3 px-6 rounded-lg font-semibold text-white transition-all ${
-            isAnalyzing ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg'
+            isAnalyzing ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark hover:shadow-custom-md'
           }`}
           onClick={handleAnalyze}
           disabled={isAnalyzing}
         >
           {isAnalyzing ? 'Analyzing...' : 'Analyze Message'}
         </button>
-        {error && <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
+        {error && <div className="mt-4 p-4 bg-error bg-opacity-10 border border-error rounded-lg text-error">{error}</div>}
         {result && <ResultDisplay result={result} />}
       </div>
     </div>
@@ -349,35 +357,35 @@ const JobAnalyzer: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+      <div className="bg-surface rounded-xl shadow-custom-lg border border-custom p-6">
         <div className="flex items-center gap-3 mb-2">
           <IconWork />
-          <h2 className="text-2xl font-bold text-gray-800">Job Advertisement Analysis</h2>
+          <h2 className="text-2xl font-bold text-text">Job Advertisement Analysis</h2>
         </div>
-        <p className="text-gray-600 mb-4 ml-10">Verify if a job posting is legitimate</p>
+        <p className="text-secondary mb-4 ml-10">Verify if a job posting is legitimate</p>
         <textarea
-          className="w-full h-32 p-4 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          className="w-full h-32 p-4 border border-custom rounded-lg mb-4 focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-surface text-text"
           placeholder="Paste the full job advertisement here..."
           value={jobText}
           onChange={(e) => setJobText(e.target.value)}
         />
         <input
           type="text"
-          className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          className="w-full p-3 border border-custom rounded-lg mb-4 focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-surface text-text"
           placeholder="Company Name (optional)"
           value={companyName}
           onChange={(e) => setCompanyName(e.target.value)}
         />
         <button
           className={`w-full py-3 px-6 rounded-lg font-semibold text-white transition-all ${
-            isAnalyzing ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 hover:shadow-lg'
+            isAnalyzing ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark hover:shadow-custom-md'
           }`}
           onClick={handleAnalyze}
           disabled={isAnalyzing}
         >
           {isAnalyzing ? 'Analyzing...' : 'Check Job Advertisement'}
         </button>
-        {error && <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
+        {error && <div className="mt-4 p-4 bg-error bg-opacity-10 border border-error rounded-lg text-error">{error}</div>}
         {result && <ResultDisplay result={result} />}
       </div>
     </div>
@@ -426,56 +434,56 @@ const URLChecker: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch(status) {
-      case 'Safe': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Suspicious': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Dangerous': return 'bg-red-100 text-red-800 border-red-200';
+      case 'Safe': return 'bg-success bg-opacity-10 text-success border-success';
+      case 'Suspicious': return 'bg-warning bg-opacity-10 text-warning border-warning';
+      case 'Dangerous': return 'bg-error bg-opacity-10 text-error border-error';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+      <div className="bg-surface rounded-xl shadow-custom-lg border border-custom p-6">
         <div className="flex items-center gap-3 mb-2">
           <IconLink />
-          <h2 className="text-2xl font-bold text-gray-800">URL Safety Check</h2>
+          <h2 className="text-2xl font-bold text-text">URL Safety Check</h2>
         </div>
-        <p className="text-gray-600 mb-4 ml-10">Check if a website link is safe or potentially malicious</p>
+        <p className="text-secondary mb-4 ml-10">Check if a website link is safe or potentially malicious</p>
         <input
           type="text"
-          className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          className="w-full p-3 border border-custom rounded-lg mb-4 focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-surface text-text"
           placeholder="Enter URL to check (e.g., https://example.com)"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
         <button
           className={`w-full py-3 px-6 rounded-lg font-semibold text-white transition-all ${
-            isChecking ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 hover:shadow-lg'
+            isChecking ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark hover:shadow-custom-md'
           }`}
           onClick={handleCheck}
           disabled={isChecking}
         >
           {isChecking ? 'Checking...' : 'Check URL'}
         </button>
-        {error && <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
+        {error && <div className="mt-4 p-4 bg-error bg-opacity-10 border border-error rounded-lg text-error">{error}</div>}
         {result && (
           <div className="mt-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-              <h3 className="text-xl font-semibold text-gray-800">URL Analysis</h3>
+            <div className="flex items-center justify-between border-b border-custom pb-4">
+              <h3 className="text-xl font-semibold text-text">URL Analysis</h3>
               <span className={`px-4 py-2 rounded-full text-sm font-semibold border ${getStatusColor(result.safety_status)}`}>
                 {result.safety_status}
               </span>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-600">Risk Score</p>
-              <p className="text-2xl font-bold text-gray-800">{(result.risk_score * 100).toFixed(0)}%</p>
+            <div className="bg-gray-50 p-4 rounded-lg border border-custom">
+              <p className="text-sm text-secondary">Risk Score</p>
+              <p className="text-2xl font-bold text-text">{(result.risk_score * 100).toFixed(0)}%</p>
             </div>
             {result.indicators && result.indicators.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h4 className="font-semibold text-yellow-800 mb-2">Suspicious Indicators</h4>
+              <div className="bg-warning bg-opacity-10 border border-warning rounded-lg p-4">
+                <h4 className="font-semibold text-warning mb-2">Suspicious Indicators</h4>
                 <ul className="list-disc pl-5 space-y-1">
                   {result.indicators.map((indicator: string, idx: number) => (
-                    <li key={idx} className="text-yellow-700">{indicator}</li>
+                    <li key={idx} className="text-warning">{indicator}</li>
                   ))}
                 </ul>
               </div>
@@ -543,29 +551,29 @@ const ImageAnalyzer: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+      <div className="bg-surface rounded-xl shadow-custom-lg border border-custom p-6">
         <div className="flex items-center gap-3 mb-2">
           <IconImage />
-          <h2 className="text-2xl font-bold text-gray-800">Image & Screenshot Analysis</h2>
+          <h2 className="text-2xl font-bold text-text">Image & Screenshot Analysis</h2>
         </div>
-        <p className="text-gray-600 mb-4 ml-10">Upload a screenshot of a suspicious message for analysis</p>
+        <p className="text-secondary mb-4 ml-10">Upload a screenshot of a suspicious message for analysis</p>
         
         <input
           type="file"
           accept="image/*"
-          className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg mb-4 cursor-pointer hover:border-blue-500 transition-colors"
+          className="w-full p-4 border-2 border-dashed border-custom rounded-lg mb-4 cursor-pointer hover:border-primary transition-colors bg-surface text-text"
           onChange={handleFileChange}
         />
         
         {preview && (
           <div className="mb-4">
-            <img src={preview} alt="Preview" className="max-h-64 mx-auto rounded-lg border" />
+            <img src={preview} alt="Preview" className="max-h-64 mx-auto rounded-lg border border-custom" />
           </div>
         )}
         
         <button
           className={`w-full py-3 px-6 rounded-lg font-semibold text-white transition-all ${
-            isAnalyzing || !file ? 'bg-gray-400 cursor-not-allowed' : 'bg-pink-600 hover:bg-pink-700 hover:shadow-lg'
+            isAnalyzing || !file ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark hover:shadow-custom-md'
           }`}
           onClick={handleAnalyze}
           disabled={isAnalyzing || !file}
@@ -573,21 +581,21 @@ const ImageAnalyzer: React.FC = () => {
           {isAnalyzing ? 'Analyzing...' : 'Analyze Image'}
         </button>
         
-        {error && <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
+        {error && <div className="mt-4 p-4 bg-error bg-opacity-10 border border-error rounded-lg text-error">{error}</div>}
         
         {result && (
-          <div className="mt-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mt-6 p-6 bg-primary-light border border-primary rounded-lg">
             <div className="flex items-center gap-2 mb-3">
-              <span className="material-icons text-blue-600">info</span>
-              <h3 className="text-lg font-semibold text-blue-800">Analysis Complete</h3>
+              <span className="material-icons text-primary">info</span>
+              <h3 className="text-lg font-semibold text-primary-dark">Analysis Complete</h3>
             </div>
-            <p className="text-blue-700">
+            <p className="text-text">
               Image uploaded successfully. The text has been extracted and analyzed.
             </p>
             {result.extracted_text && (
-              <div className="mt-3 p-3 bg-white rounded border border-blue-200">
-                <p className="text-sm text-gray-600 font-semibold">Extracted Text:</p>
-                <p className="text-sm text-gray-700 mt-1">{result.extracted_text}</p>
+              <div className="mt-3 p-3 bg-surface rounded border border-primary">
+                <p className="text-sm text-secondary font-semibold">Extracted Text:</p>
+                <p className="text-sm text-text mt-1">{result.extracted_text}</p>
               </div>
             )}
             {result.analysis && <ResultDisplay result={result.analysis} />}
@@ -595,8 +603,8 @@ const ImageAnalyzer: React.FC = () => {
         )}
         
         {!result && !error && (
-          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <p className="text-gray-600 text-sm">
+          <div className="mt-4 p-4 bg-gray-50 border border-custom rounded-lg">
+            <p className="text-secondary text-sm">
               Upload a screenshot of a suspicious message (WhatsApp, SMS, email, etc.) for analysis. 
               The system will extract text and detect potential scams.
             </p>
@@ -649,40 +657,40 @@ const MisinformationDetector: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+      <div className="bg-surface rounded-xl shadow-custom-lg border border-custom p-6">
         <div className="flex items-center gap-3 mb-2">
           <IconWarning />
-          <h2 className="text-2xl font-bold text-gray-800">Misinformation Detection</h2>
+          <h2 className="text-2xl font-bold text-text">Misinformation Detection</h2>
         </div>
-        <p className="text-gray-600 mb-4 ml-10">Analyze news articles and social media posts for potential misinformation</p>
+        <p className="text-secondary mb-4 ml-10">Analyze news articles and social media posts for potential misinformation</p>
         <textarea
-          className="w-full h-32 p-4 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          className="w-full h-32 p-4 border border-custom rounded-lg mb-4 focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-surface text-text"
           placeholder="Paste a news article, social media post, or claim here..."
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
         <button
           className={`w-full py-3 px-6 rounded-lg font-semibold text-white transition-all ${
-            isAnalyzing ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700 hover:shadow-lg'
+            isAnalyzing ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark hover:shadow-custom-md'
           }`}
           onClick={handleAnalyze}
           disabled={isAnalyzing}
         >
           {isAnalyzing ? 'Analyzing...' : 'Check for Misinformation'}
         </button>
-        {error && <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
+        {error && <div className="mt-4 p-4 bg-error bg-opacity-10 border border-error rounded-lg text-error">{error}</div>}
         {result && (
           <div className="mt-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-              <h3 className="text-xl font-semibold text-gray-800">Analysis Results</h3>
+            <div className="flex items-center justify-between border-b border-custom pb-4">
+              <h3 className="text-xl font-semibold text-text">Analysis Results</h3>
               <RiskBadge level={result.risk_level} />
             </div>
             {result.suspicious_elements && result.suspicious_elements.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h4 className="font-semibold text-yellow-800 mb-2">Suspicious Elements</h4>
+              <div className="bg-warning bg-opacity-10 border border-warning rounded-lg p-4">
+                <h4 className="font-semibold text-warning mb-2">Suspicious Elements</h4>
                 <ul className="list-disc pl-5 space-y-1">
                   {result.suspicious_elements.map((item: any, idx: number) => (
-                    <li key={idx} className="text-yellow-700">
+                    <li key={idx} className="text-warning">
                       <strong>"{item.word}"</strong> - {item.category}
                     </li>
                   ))}
@@ -900,10 +908,10 @@ const EducationHub: React.FC = () => {
 
       <div className="text-center mb-12">
         <div className="flex justify-center items-center gap-3 mb-4">
-          <span className="material-icons text-blue-600 text-4xl">school</span>
-          <h1 className="text-4xl font-bold text-gray-800">Education & Safety Hub</h1>
+          <span className="material-icons text-primary text-4xl">school</span>
+          <h1 className="text-4xl font-bold text-text">Education & Safety Hub</h1>
         </div>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+        <p className="text-xl text-secondary max-w-2xl mx-auto">
           Learn how to protect yourself from online scams and misinformation
         </p>
       </div>
@@ -912,29 +920,29 @@ const EducationHub: React.FC = () => {
         {topics.map((topic) => (
           <div 
             key={topic.id}
-            className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100"
+            className="bg-surface rounded-xl shadow-custom-md hover:shadow-custom-lg transition-all duration-300 overflow-hidden border border-custom"
           >
             <div 
-              className="p-6 cursor-pointer hover:bg-gray-50 transition-colors" 
+              className="p-6 cursor-pointer hover:bg-primary-light transition-colors" 
               onClick={() => toggleTopic(topic.id)}
             >
               <div className="flex items-center gap-3 mb-2">
-                <span className="material-icons text-blue-600 text-3xl">{topic.icon}</span>
-                <h3 className="text-xl font-bold text-gray-800">{topic.title}</h3>
+                <span className="material-icons text-primary text-3xl">{topic.icon}</span>
+                <h3 className="text-xl font-bold text-text">{topic.title}</h3>
               </div>
-              <p className="text-gray-600 text-sm ml-11">{topic.description}</p>
-              <div className="flex items-center justify-end mt-3 text-blue-600 text-sm font-medium">
+              <p className="text-secondary text-sm ml-11">{topic.description}</p>
+              <div className="flex items-center justify-end mt-3 text-primary text-sm font-medium">
                 <span className="material-icons text-sm">{expandedTopic === topic.id ? 'expand_less' : 'expand_more'}</span>
               </div>
             </div>
             
             {expandedTopic === topic.id && (
-              <div className="px-6 pb-6 border-t border-gray-100 pt-4">
+              <div className="px-6 pb-6 border-t border-custom pt-4">
                 <ul className="space-y-2">
                   {topic.content.map((item, idx) => (
                     <li key={idx} className="flex items-start gap-2">
-                      <span className="material-icons text-blue-500 text-sm mt-0.5">check_circle</span>
-                      <span className="text-gray-700 text-sm">{item}</span>
+                      <span className="material-icons text-primary text-sm mt-0.5">check_circle</span>
+                      <span className="text-text text-sm">{item}</span>
                     </li>
                   ))}
                 </ul>
@@ -945,33 +953,33 @@ const EducationHub: React.FC = () => {
       </div>
 
       {/* Interactive Quizzes */}
-      <div className="mt-12 bg-white rounded-xl shadow-lg border border-gray-100 p-8">
+      <div className="mt-12 bg-surface rounded-xl shadow-custom-lg border border-custom p-8">
         <div className="flex items-center gap-3 mb-4">
-          <span className="material-icons text-blue-600 text-3xl">quiz</span>
-          <h2 className="text-2xl font-bold text-gray-800">Knowledge Quizzes</h2>
+          <span className="material-icons text-primary text-3xl">quiz</span>
+          <h2 className="text-2xl font-bold text-text">Knowledge Quizzes</h2>
         </div>
-        <p className="text-gray-600 mb-6 ml-11">Test your understanding of scam awareness and online safety</p>
+        <p className="text-secondary mb-6 ml-11">Test your understanding of scam awareness and online safety</p>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button 
-            className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-left"
+            className="flex items-center gap-3 p-4 bg-primary-light border border-primary rounded-lg hover:bg-primary hover:bg-opacity-10 transition-colors text-left"
             onClick={() => startQuiz('phishing')}
           >
-            <span className="material-icons text-blue-600">security</span>
+            <span className="material-icons text-primary">security</span>
             <div>
-              <h4 className="font-semibold text-blue-800">Phishing Detection</h4>
-              <p className="text-sm text-blue-600">5 questions • Beginner</p>
+              <h4 className="font-semibold text-primary-dark">Phishing Detection</h4>
+              <p className="text-sm text-secondary">5 questions • Beginner</p>
             </div>
           </button>
           
           <button 
-            className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-left"
+            className="flex items-center gap-3 p-4 bg-success bg-opacity-10 border border-success rounded-lg hover:bg-success hover:bg-opacity-20 transition-colors text-left"
             onClick={() => startQuiz('password')}
           >
-            <span className="material-icons text-green-600">lock</span>
+            <span className="material-icons text-success">lock</span>
             <div>
-              <h4 className="font-semibold text-green-800">Password Security</h4>
-              <p className="text-sm text-green-600">5 questions • Intermediate</p>
+              <h4 className="font-semibold text-success">Password Security</h4>
+              <p className="text-sm text-secondary">5 questions • Intermediate</p>
             </div>
           </button>
           
@@ -982,7 +990,7 @@ const EducationHub: React.FC = () => {
             <span className="material-icons text-purple-600">auto_awesome</span>
             <div>
               <h4 className="font-semibold text-purple-800">AI Misinformation</h4>
-              <p className="text-sm text-purple-600">5 questions • Advanced</p>
+              <p className="text-sm text-secondary">5 questions • Advanced</p>
             </div>
           </button>
         </div>
@@ -1016,13 +1024,13 @@ const App: React.FC = () => {
   const ActiveComponent = components[activeTab] || ScamAnalyzer;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-md sticky top-0 z-50 border-b border-gray-200">
+    <div className="min-h-screen bg-background">
+      <nav className="bg-surface shadow-custom-sm sticky top-0 z-50 border-b border-custom">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-wrap items-center justify-between py-3">
             <div className="flex items-center gap-2">
-              <span className="material-icons text-blue-600 text-3xl">shield</span>
-              <h1 className="text-2xl font-bold text-blue-600 tracking-tight">AI Scam Hub</h1>
+              <span className="material-icons text-primary text-3xl">shield</span>
+              <h1 className="text-2xl font-bold text-primary tracking-tight">AI Scam Hub</h1>
             </div>
             <div className="flex flex-wrap gap-1 md:gap-2">
               {tabs.map(tab => (
@@ -1030,8 +1038,8 @@ const App: React.FC = () => {
                   key={tab.id}
                   className={`flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     activeTab === tab.id
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                      ? 'bg-primary-light text-primary-dark border border-primary'
+                      : 'text-secondary hover:bg-primary-light hover:text-primary-dark'
                   }`}
                   onClick={() => setActiveTab(tab.id)}
                 >
