@@ -6,15 +6,13 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-eng \
-    libtesseract-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
+# Copy requirements (without spacy)
 COPY requirements.txt .
 
-# Install specific spaCy version and download model
-RUN pip install --no-cache-dir -r requirements.txt && \
-    python -m spacy download en_core_web_sm-3.7.1 --direct
+# Install only essential packages
+RUN pip install --no-cache-dir fastapi uvicorn python-multipart sqlalchemy psycopg2-binary python-jose[cryptography] passlib[bcrypt] python-dotenv scikit-learn pytesseract opencv-python Pillow numpy pandas joblib httpx beautifulsoup4 lxml pydantic-settings
 
 # Copy application
 COPY . .
