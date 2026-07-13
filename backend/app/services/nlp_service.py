@@ -1,164 +1,149 @@
-import joblib
 import re
-import os
 from typing import Dict, List
 
 class ScamDetectionService:
     def __init__(self):
-        self.model = None
-        self.vectorizer = None
-        self._load_models()
-    
-    def _load_models(self):
-        """Load the trained ML models"""
-        try:
-            model_paths = [
-                '../ml-models/scam_classifier.pkl',
-                'ml-models/scam_classifier.pkl',
+        self.scam_patterns = {
+            'urgency': [
+                'urgent', 'immediately', 'hurry', 'asap', 'act now', 'limited time', 
+                'expire', 'deadline', "don't miss", 'last chance', 'immediate', 'now', 'today'
+            ],
+            'financial': [
+                'money', 'cash', 'bank', 'credit card', 'debit', 'payment',
+                'transfer', 'wallet', 'account', 'r50,000', 'r100,000', 
+                'million', 'dollars', 'won', 'prize', 'lottery',
+                'r500', 'r1000', 'r5000', 'bitcoin', 'paypal'
+            ],
+            'personal_info': [
+                'password', 'pin', 'otp', 'verification', 'id number',
+                'confirm your details', 'update your information',
+                'social security', 'verify', 'bank details',
+                'credit card number', 'cvv', 'expiry date'
+            ],
+            'suspicious_links': [
+                'bit.ly', 'tinyurl', 'shorturl', 'goo.gl', 'click here',
+                '.xyz', '.top', '.online', '.club', '.site'
+            ],
+            'scam_phrases': [
+                'you won', 'you are the winner', 'congratulations',
+                'inherit', 'lottery', 'prize', 'free money',
+                'work from home', 'get rich quick', 'investment opportunity',
+                'claim your prize', 'you have been selected', 'urgent response needed',
+                'dear sir', 'dear madam', 'prince',
+                'confidential', 'exclusive opportunity'
+            ],
+            'social_engineering': [
+                'help me', 'i need your help', 'trust me', 
+                'family emergency', 'in trouble', 'need money',
+                'i trust you', 'you are the only one'
             ]
-            vectorizer_paths = [
-                '../ml-models/scam_vectorizer.pkl',
-                'ml-models/scam_vectorizer.pkl',
-            ]
-            
-            for mp, vp in zip(model_paths, vectorizer_paths):
-                if os.path.exists(mp) and os.path.exists(vp):
-                    self.model = joblib.load(mp)
-                    self.vectorizer = joblib.load(vp)
-                    print(f'✅ Loaded trained ML models from {mp}')
-                    return
-            
-            print('⚠️ Trained models not found, using fallback patterns')
-            self.model = None
-            self.vectorizer = None
-                
-        except Exception as e:
-            print(f'⚠️ Error loading models: {e}')
-            self.model = None
-            self.vectorizer = None
-    
-    def preprocess_text(self, text: str) -> str:
-        """Clean and preprocess text - same as training"""
-        if not text:
-            return ''
-        text = str(text).lower()
-        text = re.sub(r'[^a-zA-Z\s]', '', text)
-        text = ' '.join(text.split())
-        return text
+        }
     
     def analyze_text(self, text: str) -> Dict:
-        """Analyze text using ML model"""
-        print(f'🔍 Analyzing: {text[:50]}...')
-        
-        # Use ML model if available
-        if self.model is not None and self.vectorizer is not None:
-            try:
-                clean_text = self.preprocess_text(text)
-                vectorized = self.vectorizer.transform([clean_text])
-                
-                prob_array = self.model.predict_proba(vectorized)
-                probability = float(prob_array[0][1])
-                print(f'✅ ML Probability: {probability}')
-                
-                if probability > 0.7:
-                    risk_level = 'High'
-                elif probability > 0.3:
-                    risk_level = 'Medium'
-                else:
-                    risk_level = 'Low'
-                
-                return {
-                    'risk_level': risk_level,
-                    'confidence_score': round(probability, 2),
-                    'scam_probability': round(probability, 2),
-                    'indicators': self._extract_indicators(text),
-                    'explanation': self._generate_explanations(text, probability),
-                    'recommendations': self._generate_recommendations(probability)
-                }
-            except Exception as e:
-                print(f'⚠️ ML error: {e}')
-                return self._fallback_analysis(text)
-        
-        print('⚠️ Using fallback pattern matching')
-        return self._fallback_analysis(text)
-    
-    def _extract_indicators(self, text: str) -> List:
-        """Extract scam indicators - only for display, not for decision making"""
-        indicators = []
         text_lower = text.lower()
+        indicators = []
         
-        # Only use keywords for display, not for classification
-        keyword_map = {
-            'urgency': ['urgent', 'immediately', 'hurry', 'asap', 'act now'],
-            'financial': ['money', 'cash', 'bank', 'payment', 'transfer', 'million', 'dollars'],
-            'personal_info': ['password', 'pin', 'otp', 'verification', 'id'],
-            'suspicious_links': ['bit.ly', 'tinyurl', 'click here', 'http://', 'https://'],
-            'social_engineering': ['help me', 'trust me', 'confidential', 'secret']
-        }
-        
-        for category, keywords in keyword_map.items():
-            matches = [k for k in keywords if k in text_lower]
+        for category, patterns in self.scam_patterns.items():
+            matches = [p for p in patterns if p in text_lower]
             if matches:
+                severity = 'High' if len(matches) > 2 else 'Medium' if len(matches) > 1 else 'Low'
                 indicators.append({
                     'category': category,
-                    'matches': matches[:3],
-                    'severity': 'High' if len(matches) > 2 else 'Medium'
+                    'matches': matches[:5],
+                    'severity': severity
                 })
         
-        return indicators
+        total_indicators = len(indicators)
+        scam_probability = min(0.95, total_indicators * 0.15 + 0.2)
+        confidence_score = min(0.95, total_indicators * 0.12 + 0.3)
+        
+        # Boost for specific scam types
+        if any(phrase in text_lower for phrase in ['prince', 'inheritance', 'foreign partner', 'transfer money']):
+            scam_probability = min(0.95, scam_probability + 0.25)
+            confidence_score = min(0.95, confidence_score + 0.20)
+        
+        if any(phrase in text_lower for phrase in ['urgent', 'suspended', 'verify immediately']):
+            scam_probability = min(0.95, scam_probability + 0.20)
+            confidence_score = min(0.95, confidence_score + 0.15)
+        
+        if total_indicators >= 3:
+            risk_level = 'High'
+        elif total_indicators >= 1:
+            risk_level = 'Medium'
+        else:
+            risk_level = 'Low'
+        
+        explanations = self._generate_explanations(indicators, risk_level, text_lower)
+        recommendations = self._generate_recommendations(indicators, risk_level)
+        
+        return {
+            'risk_level': risk_level,
+            'confidence_score': round(confidence_score, 2),
+            'scam_probability': round(scam_probability, 2),
+            'indicators': indicators,
+            'explanation': explanations,
+            'recommendations': recommendations
+        }
     
-    def _generate_explanations(self, text: str, probability: float) -> List[str]:
-        """Generate explanations based on ML prediction"""
+    def _generate_explanations(self, indicators: List, risk_level: str, text_lower: str) -> List[str]:
         explanations = []
         
-        if probability > 0.7:
-            explanations.append('This message shows strong scam indicators with high confidence.')
-        elif probability > 0.3:
-            explanations.append('This message shows some suspicious patterns requiring caution.')
+        if risk_level == 'High':
+            explanations.append("This message shows multiple strong indicators of a scam.")
+        elif risk_level == 'Medium':
+            explanations.append("This message shows some suspicious patterns that require caution.")
         else:
-            explanations.append('This message appears to be legitimate with low scam indicators.')
+            explanations.append("No significant scam indicators were detected.")
         
-        # Add general observations (not hardcoded)
-        text_lower = text.lower()
-        if any(word in text_lower for word in ['won', 'congratulations', 'winner', 'prize']):
-            explanations.append('Contains language commonly used in lottery or prize scams.')
-        if any(word in text_lower for word in ['urgent', 'immediately', 'hurry', 'act now']):
-            explanations.append('Uses urgency tactics to pressure you into acting quickly.')
-        if any(word in text_lower for word in ['click here', 'link', 'http', 'https']):
-            explanations.append('Contains links that may lead to phishing websites.')
-        if any(word in text_lower for word in ['money', 'bank', 'payment', 'transfer']):
-            explanations.append('Mentions financial transactions - a common scam tactic.')
-        if any(word in text_lower for word in ['help me', 'trust me', 'confidential']):
-            explanations.append('Uses social engineering tactics to build trust.')
+        for indicator in indicators[:3]:
+            category = indicator['category']
+            matches = indicator['matches'][:2]
+            if category == 'urgency':
+                explanations.append(f"Uses urgency: Found '{', '.join(matches)}'")
+            elif category == 'financial':
+                explanations.append(f"Financial content: Found '{', '.join(matches)}'")
+            elif category == 'personal_info':
+                explanations.append(f"Requests personal information: Found '{', '.join(matches)}'")
+            elif category == 'suspicious_links':
+                explanations.append(f"Suspicious links: Found '{', '.join(matches)}'")
+            elif category == 'scam_phrases':
+                explanations.append(f"Common scam phrases: Found '{', '.join(matches)}'")
+            elif category == 'social_engineering':
+                explanations.append(f"Social engineering: Found '{', '.join(matches)}'")
         
-        explanations.append('Always verify the sender identity before taking any action.')
+        if risk_level in ['High', 'Medium']:
+            # Check for Nigerian Prince specific pattern
+            if any(phrase in text_lower for phrase in ['prince', 'inheritance', 'foreign', 'transfer', 'bank details']):
+                explanations.append("This follows the classic 'Nigerian Prince' or 'foreign inheritance' scam pattern.")
+            explanations.append("Always verify the sender's identity before taking any action.")
+        
         return explanations
     
-    def _generate_recommendations(self, probability: float) -> List[str]:
-        """Generate recommendations based on ML probability"""
+    def _generate_recommendations(self, indicators: List, risk_level: str) -> List[str]:
         recommendations = []
         
-        if probability > 0.3:
-            recommendations.append('Do not respond to this message')
-            recommendations.append('Do not click any links or download attachments')
+        if risk_level in ['High', 'Medium']:
+            recommendations.append("Do not respond to this message")
+            recommendations.append("Do not click any links or download attachments")
+            
+            has_financial = any(i['category'] == 'financial' for i in indicators)
+            has_personal = any(i['category'] == 'personal_info' for i in indicators)
+            has_links = any(i['category'] == 'suspicious_links' for i in indicators)
+            has_social = any(i['category'] == 'social_engineering' for i in indicators)
+            
+            if has_financial:
+                recommendations.append("Never share financial information online")
+            if has_personal:
+                recommendations.append("Never share personal information or passwords")
+            if has_links:
+                recommendations.append("Hover over links to check where they really go")
+            if has_social:
+                recommendations.append("Be aware of social engineering tactics")
+            
+            recommendations.append("Contact the company directly using their official website or phone number")
+            recommendations.append("Report the message to your local authorities")
         
-        if probability > 0.5:
-            recommendations.append('Never share personal or financial information online')
-            recommendations.append('Verify with the official organization directly')
-            recommendations.append('Report the message to your local authorities')
-        
-        recommendations.append('If unsure, ask a trusted friend or family member')
-        recommendations.append('Learn more about scam prevention at the Education Hub')
+        recommendations.append("If unsure, ask a trusted friend or family member")
+        recommendations.append("Learn more about scams at the Education Hub")
         
         return recommendations
-    
-    def _fallback_analysis(self, text: str) -> Dict:
-        """Fallback analysis when ML model isn't available"""
-        return {
-            'risk_level': 'Medium',
-            'confidence_score': 0.5,
-            'scam_probability': 0.5,
-            'indicators': [],
-            'explanation': ['ML model not available. Using basic analysis.'],
-            'recommendations': ['Verify information from multiple sources.']
-        }
