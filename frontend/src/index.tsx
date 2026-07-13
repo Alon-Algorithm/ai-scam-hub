@@ -9,6 +9,10 @@ import { RecommendationList } from './components/RecommendationList';
 
 console.log('✅ App loading - Professional Corporate UI');
 
+// ============ API CONFIGURATION ============
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+console.log('📡 API URL:', API_URL);
+
 // ============ RESULT DISPLAY ============
 const ResultDisplay: React.FC<{ result: any }> = ({ result }) => {
   if (!result) return null;
@@ -82,15 +86,23 @@ const ScamAnalyzer: React.FC = () => {
     setResult(null);
 
     try {
-      const response = await fetch('http://localhost:8000/api/scam/analyze', {
+      console.log('📤 Sending request to:', `${API_URL}/scam/analyze`);
+      const response = await fetch(`${API_URL}/scam/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('📥 Received response:', data);
       setResult(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to analyze');
+      console.error('❌ Error:', err);
+      setError(err.message || 'Failed to analyze. Please make sure the backend is running.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -145,15 +157,23 @@ const JobAnalyzer: React.FC = () => {
     setResult(null);
 
     try {
-      const response = await fetch('http://localhost:8000/api/jobs/analyze', {
+      console.log('📤 Sending job request to:', `${API_URL}/jobs/analyze`);
+      const response = await fetch(`${API_URL}/jobs/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ job_text: jobText, company_name: companyName }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('📥 Received job response:', data);
       setResult(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to analyze');
+      console.error('❌ Error:', err);
+      setError(err.message || 'Failed to analyze job');
     } finally {
       setIsAnalyzing(false);
     }
@@ -214,14 +234,22 @@ const URLChecker: React.FC = () => {
     setResult(null);
 
     try {
-      const response = await fetch('http://localhost:8000/api/url/check', {
+      console.log('📤 Sending URL request to:', `${API_URL}/url/check`);
+      const response = await fetch(`${API_URL}/url/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('📥 Received URL response:', data);
       setResult(data);
     } catch (err: any) {
+      console.error('❌ Error:', err);
       setError(err.message || 'Failed to check URL');
     } finally {
       setIsChecking(false);
@@ -324,13 +352,21 @@ const ImageAnalyzer: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const response = await fetch('http://localhost:8000/api/image/analyze', {
+      console.log('📤 Sending image to:', `${API_URL}/image/analyze`);
+      const response = await fetch(`${API_URL}/image/analyze`, {
         method: 'POST',
         body: formData,
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('📥 Received image response:', data);
       setResult(data);
     } catch (err: any) {
+      console.error('❌ Error:', err);
       setError(err.message || 'Failed to analyze image');
     } finally {
       setIsAnalyzing(false);
@@ -390,15 +426,23 @@ const MisinformationDetector: React.FC = () => {
     setResult(null);
 
     try {
-      const response = await fetch('http://localhost:8000/api/misinfo/analyze', {
+      console.log('📤 Sending misinformation request to:', `${API_URL}/misinfo/analyze`);
+      const response = await fetch(`${API_URL}/misinfo/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('📥 Received misinformation response:', data);
       setResult(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to analyze');
+      console.error('❌ Error:', err);
+      setError(err.message || 'Failed to analyze misinformation');
     } finally {
       setIsAnalyzing(false);
     }
