@@ -17,12 +17,16 @@ console.log('📡 API URL:', API_URL);
 const ResultDisplay: React.FC<{ result: any }> = ({ result }) => {
   if (!result) return null;
   
-  const confidence = result.confidence_score || result.score || 0;
-  const probability = result.scam_probability || result.probability || 0;
+  // Handle different field names from different endpoints
+  const confidence = result.confidence_score !== undefined ? result.confidence_score : 
+                    result.score !== undefined ? result.score : 0;
+  const probability = result.scam_probability !== undefined ? result.scam_probability : 
+                     result.probability !== undefined ? result.probability : 0;
   const riskLevel = result.risk_level || 'Low';
   const indicators = result.indicators || [];
   const explanations = result.explanation || result.explanations || [];
   const recommendations = result.recommendations || [];
+  const isSuspicious = result.is_suspicious;
   
   return (
     <div className="mt-6 space-y-4">
@@ -44,6 +48,13 @@ const ResultDisplay: React.FC<{ result: any }> = ({ result }) => {
           </p>
         </div>
       </div>
+      {isSuspicious !== undefined && (
+        <div className={`p-3 rounded-lg text-center font-semibold ${
+          isSuspicious ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'
+        }`}>
+          {isSuspicious ? '⚠️ This job posting appears suspicious' : '✅ This job posting appears legitimate'}
+        </div>
+      )}
       {explanations && explanations.length > 0 && (
         <ExplanationCard explanations={explanations} />
       )}
@@ -57,7 +68,7 @@ const ResultDisplay: React.FC<{ result: any }> = ({ result }) => {
             {indicators.map((indicator: any, idx: number) => (
               <li key={idx} className="text-gray-700">
                 <span className="font-medium">{indicator.category || 'Indicator'}:</span>{' '}
-                {indicator.matches ? indicator.matches.join(', ') : indicator}
+                {indicator.matches ? indicator.matches.join(', ') : typeof indicator === 'string' ? indicator : JSON.stringify(indicator)}
                 {indicator.severity && (
                   <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
                     indicator.severity === 'High' ? 'bg-red-100 text-red-700' :
@@ -84,7 +95,7 @@ const IconImage = () => <span className="material-icons text-pink-600 text-2xl">
 const IconWarning = () => <span className="material-icons text-orange-600 text-2xl">warning</span>;
 const IconSchool = () => <span className="material-icons text-indigo-600 text-2xl">school</span>;
 
-// ============ QUIZ COMPONENT ============
+// ============ QUIZ MODAL ============
 const QuizModal: React.FC<{ 
   title: string; 
   questions: any[]; 
@@ -94,14 +105,13 @@ const QuizModal: React.FC<{
   const [selectedAnswer, setSelectedAnswer] = React.useState<number | null>(null);
   const [score, setScore] = React.useState(0);
   const [showResult, setShowResult] = React.useState(false);
-  const [answers, setAnswers] = React.useState<boolean[]>([]);
 
   const handleAnswer = (index: number) => {
     if (selectedAnswer !== null) return;
     setSelectedAnswer(index);
-    const isCorrect = index === questions[currentQuestion].correct;
-    if (isCorrect) setScore(score + 1);
-    setAnswers([...answers, isCorrect]);
+    if (index === questions[currentQuestion].correct) {
+      setScore(score + 1);
+    }
   };
 
   const handleNext = () => {
@@ -118,7 +128,6 @@ const QuizModal: React.FC<{
     setSelectedAnswer(null);
     setScore(0);
     setShowResult(false);
-    setAnswers([]);
   };
 
   if (showResult) {
@@ -540,17 +549,20 @@ const ImageAnalyzer: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-800">Image & Screenshot Analysis</h2>
         </div>
         <p className="text-gray-600 mb-4 ml-10">Upload a screenshot of a suspicious message for analysis</p>
+        
         <input
           type="file"
           accept="image/*"
           className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg mb-4 cursor-pointer hover:border-blue-500 transition-colors"
           onChange={handleFileChange}
         />
+        
         {preview && (
           <div className="mb-4">
             <img src={preview} alt="Preview" className="max-h-64 mx-auto rounded-lg border" />
           </div>
         )}
+        
         <button
           className={`w-full py-3 px-6 rounded-lg font-semibold text-white transition-all ${
             isAnalyzing || !file ? 'bg-gray-400 cursor-not-allowed' : 'bg-pink-600 hover:bg-pink-700 hover:shadow-lg'
@@ -560,8 +572,36 @@ const ImageAnalyzer: React.FC = () => {
         >
           {isAnalyzing ? 'Analyzing...' : 'Analyze Image'}
         </button>
+        
         {error && <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
-        {result && <ResultDisplay result={result.analysis || result} />}
+        
+        {result && (
+          <div className="mt-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="material-icons text-blue-600">info</span>
+              <h3 className="text-lg font-semibold text-blue-800">Analysis Complete</h3>
+            </div>
+            <p className="text-blue-700">
+              Image uploaded successfully. The text has been extracted and analyzed.
+            </p>
+            {result.extracted_text && (
+              <div className="mt-3 p-3 bg-white rounded border border-blue-200">
+                <p className="text-sm text-gray-600 font-semibold">Extracted Text:</p>
+                <p className="text-sm text-gray-700 mt-1">{result.extracted_text}</p>
+              </div>
+            )}
+            {result.analysis && <ResultDisplay result={result.analysis} />}
+          </div>
+        )}
+        
+        {!result && !error && (
+          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <p className="text-gray-600 text-sm">
+              Upload a screenshot of a suspicious message (WhatsApp, SMS, email, etc.) for analysis. 
+              The system will extract text and detect potential scams.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -850,7 +890,6 @@ const EducationHub: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      {/* Quiz Modal */}
       {activeQuiz && (
         <QuizModal
           title={activeQuiz.title}
