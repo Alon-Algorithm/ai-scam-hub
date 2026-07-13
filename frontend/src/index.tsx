@@ -17,38 +17,56 @@ console.log('📡 API URL:', API_URL);
 const ResultDisplay: React.FC<{ result: any }> = ({ result }) => {
   if (!result) return null;
   
+  const confidence = result.confidence_score || result.score || 0;
+  const probability = result.scam_probability || result.probability || 0;
+  const riskLevel = result.risk_level || 'Low';
+  const indicators = result.indicators || [];
+  const explanations = result.explanation || result.explanations || [];
+  const recommendations = result.recommendations || [];
+  
   return (
     <div className="mt-6 space-y-4">
       <div className="flex items-center justify-between border-b border-gray-200 pb-4">
         <h3 className="text-xl font-semibold text-gray-800">Analysis Results</h3>
-        <RiskBadge level={result.risk_level || 'Low'} />
+        <RiskBadge level={riskLevel} />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
           <p className="text-sm text-gray-600">Confidence Score</p>
-          <p className="text-2xl font-bold text-gray-800">{(result.confidence_score * 100).toFixed(0)}%</p>
+          <p className="text-2xl font-bold text-gray-800">
+            {confidence ? `${(confidence * 100).toFixed(0)}%` : 'N/A'}
+          </p>
         </div>
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-          <p className="text-sm text-gray-600">Scam Probability</p>
-          <p className="text-2xl font-bold text-gray-800">{(result.scam_probability * 100).toFixed(0)}%</p>
+          <p className="text-sm text-gray-600">Risk Score</p>
+          <p className="text-2xl font-bold text-gray-800">
+            {probability ? `${(probability * 100).toFixed(0)}%` : 'N/A'}
+          </p>
         </div>
       </div>
-      <ExplanationCard explanations={result.explanation || []} />
-      <RecommendationList recommendations={result.recommendations || []} />
-      {result.indicators && result.indicators.length > 0 && (
+      {explanations && explanations.length > 0 && (
+        <ExplanationCard explanations={explanations} />
+      )}
+      {recommendations && recommendations.length > 0 && (
+        <RecommendationList recommendations={recommendations} />
+      )}
+      {indicators && indicators.length > 0 && (
         <div className="mt-4">
           <h4 className="font-semibold text-gray-800 mb-2">Detected Indicators</h4>
           <ul className="list-disc pl-5 space-y-1">
-            {result.indicators.map((indicator: any, idx: number) => (
+            {indicators.map((indicator: any, idx: number) => (
               <li key={idx} className="text-gray-700">
-                <span className="font-medium">{indicator.category}:</span> {indicator.matches.join(', ')}
-                <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
-                  indicator.severity === 'High' ? 'bg-red-100 text-red-700' :
-                  indicator.severity === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-green-100 text-green-700'
-                }`}>
-                  {indicator.severity}
-                </span>
+                <span className="font-medium">{indicator.category || 'Indicator'}:</span>{' '}
+                {indicator.matches ? indicator.matches.join(', ') : indicator}
+                {indicator.severity && (
+                  <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
+                    indicator.severity === 'High' ? 'bg-red-100 text-red-700' :
+                    indicator.severity === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-green-100 text-green-700'
+                  }`}>
+                    {indicator.severity}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -65,8 +83,149 @@ const IconLink = () => <span className="material-icons text-green-600 text-2xl">
 const IconImage = () => <span className="material-icons text-pink-600 text-2xl">image</span>;
 const IconWarning = () => <span className="material-icons text-orange-600 text-2xl">warning</span>;
 const IconSchool = () => <span className="material-icons text-indigo-600 text-2xl">school</span>;
-const IconCheck = () => <span className="material-icons text-blue-600 text-sm">check_circle</span>;
-const IconArrow = () => <span className="material-icons text-gray-400 text-sm">chevron_right</span>;
+
+// ============ QUIZ COMPONENT ============
+const QuizModal: React.FC<{ 
+  title: string; 
+  questions: any[]; 
+  onClose: () => void;
+}> = ({ title, questions, onClose }) => {
+  const [currentQuestion, setCurrentQuestion] = React.useState(0);
+  const [selectedAnswer, setSelectedAnswer] = React.useState<number | null>(null);
+  const [score, setScore] = React.useState(0);
+  const [showResult, setShowResult] = React.useState(false);
+  const [answers, setAnswers] = React.useState<boolean[]>([]);
+
+  const handleAnswer = (index: number) => {
+    if (selectedAnswer !== null) return;
+    setSelectedAnswer(index);
+    const isCorrect = index === questions[currentQuestion].correct;
+    if (isCorrect) setScore(score + 1);
+    setAnswers([...answers, isCorrect]);
+  };
+
+  const handleNext = () => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+      setSelectedAnswer(null);
+    } else {
+      setShowResult(true);
+    }
+  };
+
+  const handleRestart = () => {
+    setCurrentQuestion(0);
+    setSelectedAnswer(null);
+    setScore(0);
+    setShowResult(false);
+    setAnswers([]);
+  };
+
+  if (showResult) {
+    const percentage = Math.round((score / questions.length) * 100);
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
+          <div className="text-center">
+            <div className="text-6xl mb-4">
+              {percentage >= 80 ? '🎉' : percentage >= 60 ? '😊' : '📚'}
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Quiz Complete!</h2>
+            <p className="text-gray-600 mb-4">You scored {score} out of {questions.length}</p>
+            <div className="w-full bg-gray-200 rounded-full h-4 mb-6">
+              <div 
+                className={`h-4 rounded-full transition-all ${
+                  percentage >= 80 ? 'bg-green-500' : 
+                  percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                }`}
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+            <p className="text-sm text-gray-600 mb-6">
+              {percentage >= 80 ? 'Excellent! You really know your stuff!' :
+               percentage >= 60 ? 'Good job! Keep learning to stay safe online!' :
+               'Keep learning! Review the topics and try again.'}
+            </p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={handleRestart}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Retry Quiz
+              </button>
+              <button
+                onClick={onClose}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const question = questions[currentQuestion];
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+          <span className="text-sm text-gray-500">
+            Question {currentQuestion + 1} of {questions.length}
+          </span>
+        </div>
+        
+        <div className="mb-6">
+          <p className="text-lg text-gray-800">{question.question}</p>
+        </div>
+
+        <div className="space-y-3">
+          {question.options.map((option: string, idx: number) => (
+            <button
+              key={idx}
+              onClick={() => handleAnswer(idx)}
+              className={`w-full text-left p-4 rounded-lg border transition-all ${
+                selectedAnswer === null
+                  ? 'hover:bg-gray-50 hover:border-blue-300'
+                  : idx === question.correct
+                  ? 'bg-green-50 border-green-500'
+                  : selectedAnswer === idx
+                  ? 'bg-red-50 border-red-500'
+                  : 'border-gray-200'
+              }`}
+              disabled={selectedAnswer !== null}
+            >
+              <span className="font-medium">{String.fromCharCode(65 + idx)}. </span>
+              {option}
+              {selectedAnswer !== null && idx === question.correct && (
+                <span className="ml-2 text-green-600">✓</span>
+              )}
+              {selectedAnswer === idx && idx !== question.correct && (
+                <span className="ml-2 text-red-600">✗</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-6 flex justify-between items-center">
+          <span className="text-sm text-gray-500">
+            Score: {score} / {questions.length}
+          </span>
+          {selectedAnswer !== null && (
+            <button
+              onClick={handleNext}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              {currentQuestion < questions.length - 1 ? 'Next Question →' : 'See Results'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ============ SCAM ANALYZER ============
 const ScamAnalyzer: React.FC = () => {
@@ -502,6 +661,7 @@ const MisinformationDetector: React.FC = () => {
 // ============ EDUCATION HUB ============
 const EducationHub: React.FC = () => {
   const [expandedTopic, setExpandedTopic] = React.useState<string | null>(null);
+  const [activeQuiz, setActiveQuiz] = React.useState<{title: string, questions: any[]} | null>(null);
 
   const topics = [
     {
@@ -584,12 +744,121 @@ const EducationHub: React.FC = () => {
     }
   ];
 
+  const quizzes = {
+    phishing: {
+      title: 'Phishing Detection Quiz',
+      questions: [
+        {
+          question: 'What is a common sign of a phishing email?',
+          options: ['Professional language and perfect grammar', 'Urgent requests for personal information', 'Links to reputable websites', 'All of the above'],
+          correct: 1
+        },
+        {
+          question: 'What should you do if you receive a suspicious email?',
+          options: ['Reply and ask for more information', 'Click the link to verify', 'Don\'t respond and report it', 'Forward it to all your contacts'],
+          correct: 2
+        },
+        {
+          question: 'What does "phishing" refer to?',
+          options: ['A legitimate marketing technique', 'An attempt to steal personal information through deceptive emails', 'A new programming language', 'A type of computer virus'],
+          correct: 1
+        },
+        {
+          question: 'Which of these is a red flag in an email?',
+          options: ['Personalized greeting', 'Requests for your password', 'Professional signature', 'Clear subject line'],
+          correct: 1
+        },
+        {
+          question: 'What should you check before clicking a link in an email?',
+          options: ['The font size', 'The color of the link', 'The actual URL by hovering over it', 'Whether the link is bold'],
+          correct: 2
+        }
+      ]
+    },
+    password: {
+      title: 'Password Security Quiz',
+      questions: [
+        {
+          question: 'What makes a password strong?',
+          options: ['Using your pet\'s name', 'At least 12 characters with a mix of types', 'Using the same password everywhere', 'Using only numbers'],
+          correct: 1
+        },
+        {
+          question: 'How often should you change your passwords?',
+          options: ['Never', 'Every month', 'When you suspect a breach', 'Every decade'],
+          correct: 2
+        },
+        {
+          question: 'What is Two-Factor Authentication (2FA)?',
+          options: ['Using two passwords', 'A second layer of security beyond your password', 'Having two accounts', 'A type of password manager'],
+          correct: 1
+        },
+        {
+          question: 'Is it safe to use the same password for multiple accounts?',
+          options: ['Yes, it saves time', 'No, if one is compromised, all are at risk', 'Only if it\'s a strong password', 'It depends on the account type'],
+          correct: 1
+        },
+        {
+          question: 'What is a password manager?',
+          options: ['A tool to help you remember passwords', 'A tool to generate and store strong passwords securely', 'A person who manages passwords', 'A new type of lock'],
+          correct: 1
+        }
+      ]
+    },
+    ai_misinfo: {
+      title: 'AI Misinformation Quiz',
+      questions: [
+        {
+          question: 'What is AI-generated misinformation?',
+          options: ['Information created by AI that is false or misleading', 'Information created by humans', 'All AI content is misinformation', 'Only text-based content'],
+          correct: 0
+        },
+        {
+          question: 'How can you spot AI-generated content?',
+          options: ['Always trust it', 'Look for inconsistencies, unnatural language, and check sources', 'It\'s impossible to spot', 'Only use social media to verify'],
+          correct: 1
+        },
+        {
+          question: 'What should you do before sharing news online?',
+          options: ['Share it immediately', 'Verify the source and check multiple outlets', 'Only share if it\'s shocking', 'Share it only on one platform'],
+          correct: 1
+        },
+        {
+          question: 'What is a deepfake?',
+          options: ['A type of social media post', 'AI-generated media that manipulates faces and voices', 'A new type of camera', 'A legitimate news source'],
+          correct: 1
+        },
+        {
+          question: 'Why is critical thinking important online?',
+          options: ['It\'s not important', 'Because not everything you read online is true', 'Only for young people', 'To win arguments'],
+          correct: 1
+        }
+      ]
+    }
+  };
+
   const toggleTopic = (id: string) => {
     setExpandedTopic(expandedTopic === id ? null : id);
   };
 
+  const startQuiz = (quizKey: string) => {
+    const quiz = quizzes[quizKey as keyof typeof quizzes];
+    if (quiz) {
+      setActiveQuiz(quiz);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-6">
+      {/* Quiz Modal */}
+      {activeQuiz && (
+        <QuizModal
+          title={activeQuiz.title}
+          questions={activeQuiz.questions}
+          onClose={() => setActiveQuiz(null)}
+        />
+      )}
+
       <div className="text-center mb-12">
         <div className="flex justify-center items-center gap-3 mb-4">
           <span className="material-icons text-blue-600 text-4xl">school</span>
@@ -646,56 +915,37 @@ const EducationHub: React.FC = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button 
-            className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-            onClick={() => alert('Phishing Quiz - Click here to start!')}
+            className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-left"
+            onClick={() => startQuiz('phishing')}
           >
             <span className="material-icons text-blue-600">security</span>
-            <div className="text-left">
+            <div>
               <h4 className="font-semibold text-blue-800">Phishing Detection</h4>
-              <p className="text-sm text-blue-600">10 questions • Beginner</p>
+              <p className="text-sm text-blue-600">5 questions • Beginner</p>
             </div>
           </button>
           
           <button 
-            className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
-            onClick={() => alert('Password Security Quiz - Click here to start!')}
+            className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-left"
+            onClick={() => startQuiz('password')}
           >
             <span className="material-icons text-green-600">lock</span>
-            <div className="text-left">
+            <div>
               <h4 className="font-semibold text-green-800">Password Security</h4>
-              <p className="text-sm text-green-600">8 questions • Intermediate</p>
+              <p className="text-sm text-green-600">5 questions • Intermediate</p>
             </div>
           </button>
           
           <button 
-            className="flex items-center gap-3 p-4 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
-            onClick={() => alert('AI Misinformation Quiz - Click here to start!')}
+            className="flex items-center gap-3 p-4 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors text-left"
+            onClick={() => startQuiz('ai_misinfo')}
           >
             <span className="material-icons text-purple-600">auto_awesome</span>
-            <div className="text-left">
+            <div>
               <h4 className="font-semibold text-purple-800">AI Misinformation</h4>
-              <p className="text-sm text-purple-600">12 questions • Advanced</p>
+              <p className="text-sm text-purple-600">5 questions • Advanced</p>
             </div>
           </button>
-        </div>
-      </div>
-
-      {/* Statistics Section */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow border border-gray-100 p-6 text-center">
-          <span className="material-icons text-blue-600 text-3xl">analytics</span>
-          <div className="text-3xl font-bold text-blue-600 mt-2">50,000+</div>
-          <div className="text-sm text-gray-600">Scams Detected</div>
-        </div>
-        <div className="bg-white rounded-xl shadow border border-gray-100 p-6 text-center">
-          <span className="material-icons text-green-600 text-3xl">verified</span>
-          <div className="text-3xl font-bold text-green-600 mt-2">92%</div>
-          <div className="text-sm text-gray-600">Detection Accuracy</div>
-        </div>
-        <div className="bg-white rounded-xl shadow border border-gray-100 p-6 text-center">
-          <span className="material-icons text-purple-600 text-3xl">people</span>
-          <div className="text-3xl font-bold text-purple-600 mt-2">10,000+</div>
-          <div className="text-sm text-gray-600">Users Protected</div>
         </div>
       </div>
     </div>
