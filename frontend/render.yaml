@@ -1,0 +1,12 @@
+﻿services:
+  - type: web
+    name: ai-scam-hub-frontend
+    runtime: static
+    repo: https://github.com/YOUR_USERNAME/ai-scam-hub
+    plan: free
+    branch: main
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://ai-scam-hub-api.onrender.com/api

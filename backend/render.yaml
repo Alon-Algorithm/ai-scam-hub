@@ -1,0 +1,20 @@
+﻿services:
+  - type: web
+    name: ai-scam-hub-api
+    runtime: python
+    repo: https://github.com/YOUR_USERNAME/ai-scam-hub
+    plan: free
+    branch: main
+    buildCommand: |
+      pip install -r requirements.txt
+      python -m spacy download en_core_web_sm
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./scamhub.db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_ORIGINS
+        value: https://ai-scam-hub.onrender.com
