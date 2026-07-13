@@ -1,8 +1,13 @@
-﻿services:
+services:
   - type: web
     name: ai-scam-hub-frontend
     runtime: static
+    repo: https://github.com/Alon-Algorithm/ai-scam-hub
     plan: free
     branch: main
+    rootDir: frontend
     buildCommand: npm install && chmod +x node_modules/.bin/react-scripts && npm run build
-    staticPublishPath: ./build
+    staticPublishPath: build
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
