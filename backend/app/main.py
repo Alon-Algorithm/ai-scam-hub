@@ -33,7 +33,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://localhost:3001",
+        "http://localhost:8000",
          "https://ai-scam-hub-frontend.onrender.com",
         "https://ai-scam-hub-1.onrender.com",  # ← YOUR ACTUAL FRONTEND URL
         "https://ai-scam-hub.onrender.com"
