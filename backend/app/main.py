@@ -34,8 +34,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://ai-scam-hub.onrender.com",  # Your frontend URL
-        "https://your-frontend-app.onrender.com"  # Replace with your actual frontend URL
+         "https://ai-scam-hub-frontend.onrender.com",
+        "https://ai-scam-hub-1.onrender.com",  # ← YOUR ACTUAL FRONTEND URL
+        "https://ai-scam-hub.onrender.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
