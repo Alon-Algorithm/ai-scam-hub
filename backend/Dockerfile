@@ -4,27 +4,20 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
     tesseract-ocr \
     tesseract-ocr-eng \
     libtesseract-dev \
-    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Download spaCy model
-RUN python -m spacy download en_core_web_sm
+# Install specific spaCy version and download model
+RUN pip install --no-cache-dir -r requirements.txt && \
+    python -m spacy download en_core_web_sm-3.7.1 --direct
 
 # Copy application
 COPY . .
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
 
 EXPOSE 8000
 
